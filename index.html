@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Core Highlight Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one highlight per screen. Tray photo left, close-up and answer panel right; stacks on narrow screens. */
+:root {
+  --bg: #f3f2ee; --panel: #ffffff; --ink: #23221f; --muted: #6b6860; --line: #dcd9d0;
+  --accent: #8a5a12; --accent-ink: #ffffff; --mark: #ffcc00; --ok: #2f6b3a; --bad: #9b2f24; --new: #2d5c8a;
+  --ok-bg: #e5f0e6; --bad-bg: #f6e4e1; --new-bg: #e2ebf5; --reveal: #fbf7ec;
+  --sans: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1b1a18; --panel: #252420; --ink: #ecebe6; --muted: #a29f95; --line: #3a3832;
+  --accent: #d9a54a; --accent-ink: #1b1a18; --ok: #8fcb98; --bad: #f0a197; --new: #9cc3ea;
+  --ok-bg: #22352a; --bad-bg: #3d2522; --new-bg: #1f3044; --reveal: #2c2a22; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #1b1a18; --panel: #252420; --ink: #ecebe6; --muted: #a29f95; --line: #3a3832;
+  --accent: #d9a54a; --accent-ink: #1b1a18; --ok: #8fcb98; --bad: #f0a197; --new: #9cc3ea;
+  --ok-bg: #22352a; --bad-bg: #3d2522; --new-bg: #1f3044; --reveal: #2c2a22; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--sans); }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+.wrap { max-width: 1320px; margin: 0 auto; padding-block: 16px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2 { text-wrap: balance; margin: 0; }
+h1 { font-size: 1.35rem; font-weight: 700; }
+h2 { font-size: 1.1rem; font-weight: 600; }
+p { margin: 0; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+button { font: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-bottom: 16px; }
+header.top .count { margin-left: auto; color: var(--muted); }
+.bar { flex: 1 1 100%; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s; }
+.status { font-size: .85rem; color: var(--muted); min-height: 1.3em; }
+.status.err { color: var(--bad); }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.intro { padding: 24px; display: grid; gap: 16px; max-width: 760px; }
+.intro ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.intro .keys { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); }
+
+.item { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .item { grid-template-columns: minmax(0, 1fr); } }
+.photo { padding: 12px; display: grid; gap: 8px; }
+.frame { position: relative; line-height: 0; justify-self: center; max-width: 100%; }
+.frame img { display: block; max-width: 100%; height: auto; border-radius: 4px; }
+.frame.tray img { max-height: 78vh; width: auto; }
+.frame svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.frame rect { fill: none; stroke: var(--mark); stroke-width: 3; vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 1.5px rgba(0,0,0,.9)); }
+.hide-outline .frame svg { display: none; }
+.caption { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: .82rem; color: var(--muted); }
+.side { display: grid; gap: 16px; min-width: 0; }
+.meta { padding: 16px; display: grid; gap: 12px; }
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.facts div { display: grid; gap: 2px; min-width: 0; }
+.facts .v { font-weight: 600; overflow-wrap: anywhere; }
+.claim { padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.claim .v { font-size: 1.05rem; font-weight: 600; }
+
+.answers { display: grid; gap: 8px; }
+.answers button { display: grid; grid-template-columns: 2rem minmax(0, 1fr); align-items: center; gap: 10px; text-align: left;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); }
+.answers button kbd { font-family: var(--mono); font-size: .85rem; display: inline-grid; place-items: center; width: 1.8rem; height: 1.8rem;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
+.answers button:hover { border-color: var(--muted); }
+.answers button[data-a="correct"][aria-pressed="true"] { background: var(--ok-bg); border-color: var(--ok); }
+.answers button[data-a="wrong"][aria-pressed="true"] { background: var(--bad-bg); border-color: var(--bad); }
+.answers button[data-a="new"][aria-pressed="true"] { background: var(--new-bg); border-color: var(--new); }
+.answers small { display: block; color: var(--muted); font-size: .82rem; }
+textarea, input[type=text] { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 6px; padding: 8px 10px; width: 100%; box-sizing: border-box; }
+.reveal { padding: 14px 16px; background: var(--reveal); border: 1px solid var(--line); border-radius: 6px; display: grid; gap: 8px; }
+.reveal pre { white-space: pre-wrap; font: .9rem/1.5 var(--mono); margin: 0; overflow-wrap: anywhere; }
+.locked { color: var(--muted); font-size: .88rem; padding: 12px 14px; border: 1px dashed var(--line); border-radius: 6px; }
+.nav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn:disabled { opacity: .45; cursor: default; }
+.nav .hint { color: var(--muted); font-size: .82rem; margin-left: auto; }
+
+.end { padding: 24px; display: grid; gap: 14px; max-width: 760px; }
+.end textarea { min-height: 220px; }
+.tally { display: flex; gap: 18px; flex-wrap: wrap; }
+.missing { color: var(--bad); }
+.missing button { color: var(--accent); background: none; border: 0; padding: 0; text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="wrap" id="app">
+  <header class="top">
+    <h1>Core Highlight Check</h1>
+    <span class="count mono" id="count"></span>
+    <div class="bar" aria-hidden="true"><i id="barfill"></i></div>
+    <div class="status" id="status" role="status"></div>
+  </header>
+
+  <section class="card intro" id="intro">
+    <h2>Check what our search highlighted in Michigan core photos</h2>
+    <p>You'll see 50 spots that our system marked on core-box photos from three tuning wells (19231, BD-139 and 21064). Each one is outlined in yellow, with a close-up beside it and the feature we think it is.</p>
+    <ul>
+      <li><b>Correct</b>: the feature is there, at the outlined spot.</li>
+      <li><b>Wrong</b>: it's something else (a break, foam, a pen mark, or a different feature).</li>
+      <li><b>Real, but not in the original description</b>: the feature is there, and the box description doesn't mention it.</li>
+    </ul>
+    <p>Answer from the photo first. The geologist's original description for that box appears only after you answer, so it doesn't steer your call. A short note is optional. At the end we'll ask for 5 to 10 searches you'd really run, in your own words.</p>
+    <div class="keys"><span><b class="mono">1 2 3</b> answer</span><span><b class="mono">Enter</b> or <b class="mono">→</b> next</span><span><b class="mono">←</b> back</span><span><b class="mono">H</b> hide outline</span><span><b class="mono">N</b> note</span></div>
+    <p class="label">About 15 minutes. Your answers save as you go, so you can close the page and pick up where you left off.</p>
+    <div class="nav"><button class="btn primary" id="start" disabled>Loading photos…</button></div>
+  </section>
+
+  <section id="itemview" hidden>
+    <div class="item">
+      <div class="card photo">
+        <div class="frame tray" id="trayframe"><img id="trayimg" alt="Full core box photo with the highlighted spot outlined in yellow"><svg id="traysvg" preserveAspectRatio="none"><rect id="trayrect"></rect></svg></div>
+        <div class="caption"><span>Full tray, wet photo. Outlined spot in yellow.</span><span id="trayhint"></span></div>
+      </div>
+      <div class="side">
+        <div class="card photo">
+          <div class="frame" id="closeframe"><img id="closeimg" alt="Close-up of the highlighted spot"><svg id="closesvg" viewBox="0 0 1 1" preserveAspectRatio="none"><rect id="closerect"></rect></svg></div>
+          <div class="caption"><span>Close-up at full resolution.</span><span>Same spot, outlined.</span></div>
+        </div>
+        <div class="card meta">
+          <div class="facts">
+            <div><span class="label">Well</span><span class="v" id="well"></span></div>
+            <div><span class="label">Box</span><span class="v mono" id="box"></span></div>
+            <div><span class="label">Depth</span><span class="v mono" id="depth"></span></div>
+          </div>
+          <div class="claim"><span class="label">We think this is</span><div class="v" id="feature"></div></div>
+          <div class="answers" role="group" aria-label="Your answer">
+            <button type="button" data-a="correct" aria-pressed="false"><kbd>1</kbd><span>Correct<small>The feature is at the outlined spot</small></span></button>
+            <button type="button" data-a="wrong" aria-pressed="false"><kbd>2</kbd><span>Wrong<small>Something else is there</small></span></button>
+            <button type="button" data-a="new" aria-pressed="false"><kbd>3</kbd><span>Real, but not in the original description<small>The feature is there; the box description doesn't mention it</small></span></button>
+          </div>
+          <label class="label" for="note">Note (optional)</label>
+          <input type="text" id="note" maxlength="500" placeholder="e.g. it's a calcite vein, not a fracture" autocomplete="off">
+          <div class="locked" id="locked">The original description for this box appears after you answer.</div>
+          <div class="reveal" id="reveal" hidden>
+            <span class="label">Original description for this box</span>
+            <pre id="desc"></pre>
+            <span class="label" id="descsrc"></span>
+          </div>
+          <div class="nav">
+            <button class="btn" id="prev">Back</button>
+            <button class="btn primary" id="next" disabled>Next</button>
+            <span class="hint" id="navhint"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card end" id="endview" hidden>
+    <h2>Last step: your own searches</h2>
+    <p>Write 5 to 10 searches you would actually run when looking for intervals in core, in your own words, one per line. For example, what you'd type if a tool could search every box photo in the repository.</p>
+    <label class="label" for="searches">Your searches</label>
+    <textarea id="searches" placeholder="One search per line"></textarea>
+    <div class="nav"><button class="btn primary" id="savesearches">Save searches</button><span class="hint" id="searchstatus"></span></div>
+    <div class="tally" id="tally"></div>
+    <p class="missing" id="missing" hidden></p>
+    <div class="nav"><button class="btn" id="backtoitems">Back to the highlights</button></div>
+  </section>
+</div>
+
+<script>
+// Everything comes from the core-review function. The key is the part of the link after "#k=": it never
+// reaches the page host, and goes to the function only in a request header.
+const API = "https://uqhvfnedmquxtqfxkkgi.supabase.co/functions/v1/core-review";
+const KEY = new URLSearchParams(location.hash.slice(1)).get("k") || "";
+const ANSWER_LABEL = { correct: "Correct", wrong: "Wrong", new: "Real, not in description" };
+
+const $ = (id) => document.getElementById(id);
+const state = { i: 0, items: [], answers: {}, view: "intro", loaded: false, refreshed: false };
+let ITEMS = [];
+
+function setStatus(msg, err) { const s = $("status"); s.textContent = msg || ""; s.classList.toggle("err", !!err); }
+function done() { return ITEMS.filter((h) => state.answers[h.id]).length; }
+function progress() {
+  const n = done(), total = ITEMS.length || 50;
+  $("count").textContent = `${n} of ${total} answered`;
+  $("barfill").style.width = `${(100 * n) / total}%`;
+}
+
+async function api(route, body) {
+  const opts = { headers: { "x-review-key": KEY } };
+  if (body) { opts.method = "POST"; opts.headers["content-type"] = "application/json"; opts.body = JSON.stringify(body); }
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await fetch(`${API}/${route}`, opts);
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw Object.assign(new Error(j.error || `HTTP ${r.status}`), { status: r.status });
+      return j;
+    } catch (e) {
+      if (e.status === 401 || attempt >= 2) throw e;
+      await new Promise((res) => setTimeout(res, 800 * (attempt + 1)));
+    }
+  }
+}
+
+function show(view) {
+  state.view = view;
+  $("intro").hidden = view !== "intro";
+  $("itemview").hidden = view !== "item";
+  $("endview").hidden = view !== "end";
+  if (view === "end") renderEnd();
+}
+
+function renderItem() {
+  const h = ITEMS[state.i], a = state.answers[h.id];
+  $("trayimg").src = h.tray_url;
+  $("traysvg").setAttribute("viewBox", `0 0 ${h.tray_w} ${h.tray_h}`);
+  const [x0, y0, x1, y1] = h.tray_spot, pad = Math.max(4, 0.006 * Math.max(h.tray_w, h.tray_h));
+  Object.entries({ x: x0 - pad, y: y0 - pad, width: x1 - x0 + 2 * pad, height: y1 - y0 + 2 * pad })
+    .forEach(([k, v]) => $("trayrect").setAttribute(k, v));
+  $("closeimg").src = h.close_url;
+  const [c0, c1, c2, c3] = h.close_spot, cp = 0.012;
+  Object.entries({ x: c0 - cp, y: c1 - cp, width: c2 - c0 + 2 * cp, height: c3 - c1 + 2 * cp })
+    .forEach(([k, v]) => $("closerect").setAttribute(k, v));
+  $("trayhint").textContent = `Highlight ${state.i + 1} of ${ITEMS.length}`;
+  $("well").textContent = h.well_name;
+  $("box").textContent = h.box;
+  $("depth").textContent = `${h.top_ft.toLocaleString()}–${h.base_ft.toLocaleString()} ft`;
+  $("feature").textContent = h.feature_plain;
+  document.querySelectorAll(".answers button").forEach((b) => b.setAttribute("aria-pressed", String(!!a && a.answer === b.dataset.a)));
+  $("note").value = a ? a.note || "" : "";
+  $("locked").hidden = !!a;
+  $("reveal").hidden = !a;
+  $("desc").textContent = h.description || "No written description covers this box.";
+  $("descsrc").textContent = `Source: ${h.desc_source}`;
+  $("prev").disabled = state.i === 0;
+  $("next").disabled = !a;
+  $("next").textContent = state.i === ITEMS.length - 1 ? "Finish" : "Next";
+  $("navhint").textContent = a ? "Enter for next" : "Press 1, 2 or 3";
+  progress();
+  const nx = ITEMS[state.i + 1];          // warm the next photos
+  if (nx) { new Image().src = nx.tray_url; new Image().src = nx.close_url; }
+}
+
+let writing = Promise.resolve();
+function save(h, answer, note) {
+  writing = writing.then(async () => {
+    try {
+      const row = await api("answer", { highlight_id: h.id, answer, note, position: ITEMS.indexOf(h) + 1 });
+      state.answers[h.id] = { ...state.answers[h.id], ...row };
+      setStatus(`Saved ${h.id}`);
+    } catch (e) {
+      setStatus(e.status === 401 ? "This link isn't valid any more. Ask the sender for a new one."
+        : "Couldn't save that answer. Check your connection, then press the same key again.", true);
+    }
+  });
+}
+
+function answer(kind) {
+  const h = ITEMS[state.i];
+  state.answers[h.id] = { ...state.answers[h.id], answer: kind, note: $("note").value.trim() };
+  renderItem();
+  save(h, kind, $("note").value.trim());
+}
+
+function commitNote() {
+  const h = ITEMS[state.i], a = state.answers[h.id], v = $("note").value.trim();
+  if (!a || a.note === v) return;
+  a.note = v;
+  save(h, a.answer, v);
+}
+
+function go(delta) {
+  commitNote();
+  const j = state.i + delta;
+  if (j >= ITEMS.length) { show("end"); return; }
+  if (j < 0) return;
+  state.i = j;
+  renderItem();
+  window.scrollTo({ top: 0 });
+}
+
+function renderEnd() {
+  progress();
+  const counts = { correct: 0, wrong: 0, new: 0 };
+  Object.values(state.answers).forEach((a) => counts[a.answer]++);
+  $("tally").innerHTML = "";
+  Object.entries(counts).forEach(([k, n]) => {
+    const s = document.createElement("span");
+    s.innerHTML = `<span class="label"></span> <b class="mono"></b>`;
+    s.querySelector(".label").textContent = ANSWER_LABEL[k];
+    s.querySelector("b").textContent = n;
+    $("tally").appendChild(s);
+  });
+  const miss = ITEMS.map((h, i) => [h, i]).filter(([h]) => !state.answers[h.id]);
+  $("missing").hidden = !miss.length;
+  if (miss.length) {
+    $("missing").textContent = `${miss.length} highlight${miss.length > 1 ? "s" : ""} still unanswered. `;
+    const b = document.createElement("button");
+    b.textContent = "Go to the first one";
+    b.onclick = () => { state.i = miss[0][1]; show("item"); renderItem(); };
+    $("missing").appendChild(b);
+  }
+}
+
+async function saveSearches() {
+  $("searchstatus").textContent = "Saving…";
+  try {
+    await api("searches", { text: $("searches").value.trim() });
+    $("searchstatus").textContent = "Saved. Thank you, that's everything.";
+  } catch (e) {
+    $("searchstatus").textContent = "Couldn't save. Copy your text somewhere safe and try again.";
+  }
+}
+
+async function load() {
+  const s = await api("session");
+  const keep = ITEMS.length ? ITEMS[state.i]?.id : null;
+  ITEMS = s.items;
+  Object.assign(state.answers, s.answers);
+  if (s.searches && !$("searches").value) $("searches").value = s.searches;
+  if (keep) state.i = Math.max(0, ITEMS.findIndex((h) => h.id === keep));
+  return s;
+}
+
+// photo links expire after 2 hours: if one fails, fetch fresh links once and redraw
+function onImgError() {
+  if (state.refreshed || !state.loaded) return;
+  state.refreshed = true;
+  load().then(() => { if (state.view === "item") renderItem(); setTimeout(() => (state.refreshed = false), 60000); })
+    .catch(() => setStatus("Photos didn't load. Reload the page.", true));
+}
+
+// controls
+$("trayimg").addEventListener("error", onImgError);
+$("closeimg").addEventListener("error", onImgError);
+$("start").onclick = () => { if (!state.loaded) return; show("item"); renderItem(); };
+document.querySelectorAll(".answers button").forEach((b) => (b.onclick = () => answer(b.dataset.a)));
+$("next").onclick = () => go(1);
+$("prev").onclick = () => go(-1);
+$("note").addEventListener("blur", commitNote);
+$("savesearches").onclick = saveSearches;
+$("backtoitems").onclick = () => { show("item"); renderItem(); };
+document.addEventListener("keydown", (e) => {
+  if (state.view !== "item" || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.matches("input, textarea")) {
+    if (e.key === "Enter") { e.preventDefault(); e.target.blur(); if (state.answers[ITEMS[state.i].id]) go(1); }
+    if (e.key === "Escape") e.target.blur();
+    return;
+  }
+  const k = { "1": "correct", "2": "wrong", "3": "new" }[e.key];
+  if (k) { e.preventDefault(); answer(k); }
+  else if ((e.key === "Enter" || e.key === "ArrowRight") && state.answers[ITEMS[state.i].id]) { e.preventDefault(); go(1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); go(-1); }
+  else if (e.key === "h" || e.key === "H") document.body.classList.toggle("hide-outline");
+  else if (e.key === "n" || e.key === "N") { e.preventDefault(); $("note").focus(); }
+});
+
+progress();
+if (!KEY) {
+  setStatus("This page needs the full link you were sent (it ends with #k=…).", true);
+  $("start").textContent = "Link incomplete";
+} else {
+  load().then(() => {
+    state.loaded = true;
+    const n = done(), first = ITEMS.findIndex((h) => !state.answers[h.id]);
+    $("start").disabled = false;
+    $("start").textContent = !n ? "Start" : first < 0 ? "Review answers" : `Continue at highlight ${first + 1}`;
+    if (n && first >= 0) state.i = first;
+    setStatus(n ? `Welcome back: ${n} answered so far.` : "");
+    progress();
+  }).catch((e) => {
+    setStatus(e.status === 401 ? "This link isn't valid. Ask the sender for a new one."
+      : "Couldn't load the photos. Check your connection and reload.", true);
+    $("start").textContent = "Not available";
+  });
+}
+
+</script>
+</body>
+</html>
